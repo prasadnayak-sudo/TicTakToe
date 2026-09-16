@@ -86,7 +86,7 @@ function App() {
     <>
       <section id="center">
         <div>
-          <h1>Tic Tac Toe</h1>
+          <h1>Tic Tac</h1>
           <div className="modes" role="group" aria-label="Game mode">
             <button
               type="button"
