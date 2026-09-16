@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useReducer } from 'react'
-import { getResult, isPlayable, other } from '../game/board'
+import { DEFAULT_SIZE, emptyBoard, getResult, isPlayable, other } from '../game/board'
 import { boardFromHistory, jumpTo, takeBack, turnFromHistory } from '../game/history'
-import type { Difficulty, GameState, Mode, Move } from '../types/game'
+import type { BoardSize, Difficulty, GameState, Mode, Move } from '../types/game'
 
 type Action =
   | { type: 'play'; index: number }
@@ -10,12 +10,14 @@ type Action =
   | { type: 'newRound' }
   | { type: 'setMode'; mode: Mode }
   | { type: 'setDifficulty'; difficulty: Difficulty }
+  | { type: 'setSize'; size: BoardSize }
 
 const INITIAL: GameState = {
-  board: boardFromHistory([]),
+  board: emptyBoard(DEFAULT_SIZE),
   turn: 'X',
   mode: 'two-player',
   difficulty: 'hard',
+  size: DEFAULT_SIZE,
   history: [],
   starter: 'X',
 }
@@ -25,7 +27,7 @@ function fromHistory(state: GameState, history: Move[]): GameState {
   return {
     ...state,
     history,
-    board: boardFromHistory(history),
+    board: boardFromHistory(history, state.size),
     turn: turnFromHistory(history, state.starter),
   }
 }
@@ -54,6 +56,11 @@ function reducer(state: GameState, action: Action): GameState {
         : { ...fromHistory({ ...state, starter: 'X' }, []), mode: action.mode, starter: 'X' }
     case 'setDifficulty':
       return { ...state, difficulty: action.difficulty }
+    case 'setSize':
+      // Size badalne par purani chaalein bekaar ho jaati hain — round reset.
+      return action.size === state.size
+        ? state
+        : { ...fromHistory({ ...state, size: action.size, starter: 'X' }, []), starter: 'X' }
   }
 }
 
@@ -71,6 +78,17 @@ export function useGame() {
     (difficulty: Difficulty) => dispatch({ type: 'setDifficulty', difficulty }),
     [],
   )
+  const setSize = useCallback((size: BoardSize) => dispatch({ type: 'setSize', size }), [])
 
-  return { ...state, result, play, undo, jump, newRound, setMode, setDifficulty }
+  return {
+    ...state,
+    result,
+    play,
+    undo,
+    jump,
+    newRound,
+    setMode,
+    setDifficulty,
+    setSize,
+  }
 }

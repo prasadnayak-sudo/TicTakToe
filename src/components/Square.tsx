@@ -1,10 +1,11 @@
 import { cn } from '../lib/cn'
 import { squareLabel } from '../lib/format'
-import type { Square as SquareValue } from '../types/game'
+import type { BoardSize, Square as SquareValue } from '../types/game'
 
 type Props = {
   index: number
   value: SquareValue
+  size: BoardSize
   winning: boolean
   disabled: boolean
   onSelect: (index: number) => void
@@ -14,6 +15,7 @@ type Props = {
 export function Square({
   index,
   value,
+  size,
   winning,
   disabled,
   onSelect,
@@ -25,7 +27,7 @@ export function Square({
       data-square={index}
       className={cn('square', winning && 'winning', value && 'filled')}
       disabled={disabled}
-      aria-label={`${squareLabel(index)}: ${value ?? 'khaali'}`}
+      aria-label={`${squareLabel(index, size)}: ${value ?? 'khaali'}`}
       onClick={() => onSelect(index)}
       onKeyDown={(event) => onKeyDown(event, index)}
     >

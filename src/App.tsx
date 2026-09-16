@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { Board } from './components/Board'
+import { BoardSizeSelector } from './components/BoardSizeSelector'
 import { DifficultySelector } from './components/DifficultySelector'
 import { GameControls } from './components/GameControls'
 import { ModeSelector } from './components/ModeSelector'
@@ -14,7 +15,7 @@ import './App.css'
 
 function App() {
   const game = useGame()
-  const { stats, record, reset } = useStats(game.mode)
+  const { stats, record, reset } = useStats(game.mode, game.size)
 
   // Computer hamesha starter ka opposite khelta hai.
   const computer = other(game.starter)
@@ -48,6 +49,7 @@ function App() {
         <div className="header">
           <h1>Tic Tac</h1>
           <ModeSelector mode={game.mode} onChange={game.setMode} />
+          <BoardSizeSelector size={game.size} onChange={game.setSize} />
           {game.mode === 'computer' && (
             <DifficultySelector
               difficulty={game.difficulty}
@@ -85,12 +87,17 @@ function App() {
           <ScoreBoard
             stats={stats}
             mode={game.mode}
+            size={game.size}
             computer={computer}
             onReset={reset}
           />
         </div>
         <div id="social">
-          <MoveHistory history={game.history} onJump={game.jump} />
+          <MoveHistory
+            history={game.history}
+            size={game.size}
+            onJump={game.jump}
+          />
         </div>
       </section>
 
