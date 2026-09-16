@@ -6,7 +6,10 @@
 export type Player = 'X' | 'O'
 export type Square = Player | null
 export type Board = Square[]
-export type Line = readonly [number, number, number]
+export type Line = readonly number[]
+
+/** Board ki ek taraf ke squares. 3 = classic, 4 = chaar-in-a-row. */
+export type BoardSize = 3 | 4
 
 export type Mode = 'two-player' | 'computer'
 export type Difficulty = 'easy' | 'medium' | 'hard'
@@ -39,6 +42,7 @@ export type GameState = {
   turn: Player
   mode: Mode
   difficulty: Difficulty
+  size: BoardSize
   history: Move[]
   /** Har round mein pehla turn alternate hota hai, taki fair rahe. */
   starter: Player

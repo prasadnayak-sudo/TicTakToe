@@ -26,7 +26,7 @@ jobs:
 
       - run: npm ci
 
-      - name: Merge ka data ikattha karo
+      - name: Collect merge data
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
@@ -46,7 +46,7 @@ jobs:
             | head -c 60000 > /tmp/diff.txt
 
       # Ye hissa hamesha chalta hai — AI ke bharose nahi hai.
-      - name: Deterministic summary banao
+      - name: Build the deterministic summary
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_TITLE: ${{ github.event.pull_request.title }}
@@ -54,7 +54,7 @@ jobs:
           BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: node scripts/merge-summary.mjs > /tmp/summary.md
 
-      - name: Copilot available hai ya nahi, check karo
+      - name: Check whether Copilot is configured
         id: check
         env:
           COPILOT_PAT: ${{ secrets.COPILOT_PAT }}
@@ -63,27 +63,27 @@ jobs:
             echo "enabled=true" >> "$GITHUB_OUTPUT"
           else
             echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "COPILOT_PAT secret set nahi hai — sirf deterministic summary aayegi." >> "$GITHUB_STEP_SUMMARY"
+            echo "COPILOT_PAT secret is not set — posting the deterministic summary only." >> "$GITHUB_STEP_SUMMARY"
           fi
 
-      - name: Copilot ke liye prompt banao
+      - name: Build the Copilot prompt
         if: steps.check.outputs.enabled == 'true'
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_BODY: ${{ github.event.pull_request.body }}
         run: |
           {
-            echo "Neeche ek merge ho chuke pull request ka diff hai."
-            echo "Iska summary Hinglish (Roman Hindi + English technical terms) mein likho."
+            echo "Below is the diff of a pull request that was just merged."
+            echo "Write a summary of it in English."
             echo
             echo "Format:"
-            echo "- 2-3 line: is merge ne kya badla, business/user ke nazariye se."
-            echo "- '### Kya dhyaan rakhna hai' heading ke neeche 2-4 bullet:"
-            echo "  risky cheezein, missing tests, ya follow-up jo zaroori lage."
-            echo "- Agar koi behaviour change hua ho to usko alag se batao."
+            echo "- 2-3 lines: what this merge changed, from a user/product point of view."
+            echo "- A '### What to watch' heading with 2-4 bullets:"
+            echo "  risky bits, missing tests, or follow-ups worth doing."
+            echo "- Call out any behaviour change separately."
             echo
-            echo "Rules: jo diff mein hai sirf wahi likho, guess mat karo."
-            echo "Headings mein '##' se bada mat use karo. Diff dobara paste mat karo."
+            echo "Rules: only state what the diff actually shows. Do not guess."
+            echo "Do not use headings larger than '###'. Do not paste the diff back."
             echo
             echo "PR title: $PR_TITLE"
             echo
@@ -96,12 +96,12 @@ jobs:
             echo '```'
           } > /tmp/prompt.txt
 
-      - name: Copilot CLI install karo
+      - name: Install the Copilot CLI
         if: steps.check.outputs.enabled == 'true'
         run: npm install -g @github/copilot
 
       # AI fail ho jaye to bhi summary post honi chahiye — isliye continue-on-error.
-      - name: Copilot se summary maango
+      - name: Ask Copilot for a summary
         id: ai
         if: steps.check.outputs.enabled == 'true'
         continue-on-error: true
@@ -110,39 +110,39 @@ jobs:
           prompt-file: /tmp/prompt.txt
           model: claude-sonnet-4.5
           system-prompt: >-
-            Tum ek senior engineer ho jo merge ho chuke changes ka chhota,
-            seedha summary likhta hai. Hinglish mein likho. Sirf wahi batao jo
-            diff se pakka pata chalta ho.
+            You are a senior engineer writing a short, plain summary of changes
+            that were just merged. Write in English. Only state what the diff
+            clearly shows.
         env:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
 
-      - name: Copilot ka hissa jodo
+      - name: Append the Copilot section
         if: steps.ai.outcome == 'success' && steps.ai.outputs.response != ''
         env:
           AI_RESPONSE: ${{ steps.ai.outputs.response }}
         run: |
           {
             echo
-            echo "### 🤖 Copilot ka summary"
+            echo "### 🤖 Copilot summary"
             echo
             echo "$AI_RESPONSE"
           } >> /tmp/summary.md
 
-      - name: AI fail hua to bata do
+      - name: Note it when the AI step fails
         if: steps.check.outputs.enabled == 'true' && steps.ai.outcome != 'success'
         run: |
           {
             echo
-            echo "_🤖 Copilot summary is baar nahi bani — workflow logs mein 'Copilot se summary maango' step dekho._"
+            echo "_🤖 Copilot summary was not generated this time — check the 'Ask Copilot for a summary' step in the workflow logs._"
           } >> /tmp/summary.md
 
-      - name: PR pe comment karo
+      - name: Comment on the PR
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           header: merge-summary
           number: ${{ github.event.pull_request.number }}
           path: /tmp/summary.md
 
-      - name: Actions run pe bhi dikhao
+      - name: Show it on the Actions run too
         if: always()
         run: cat /tmp/summary.md >> "$GITHUB_STEP_SUMMARY"

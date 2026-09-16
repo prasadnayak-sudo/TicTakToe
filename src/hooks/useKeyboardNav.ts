@@ -1,15 +1,8 @@
 import { useCallback, useState } from 'react'
-import { SIZE, SQUARES } from '../game/board'
-
-const DELTA: Record<string, number> = {
-  ArrowRight: 1,
-  ArrowLeft: -1,
-  ArrowDown: SIZE,
-  ArrowUp: -SIZE,
-}
+import type { BoardSize } from '../types/game'
 
 /** Arrow keys se board par focus ghumata hai (grid ke kinare pe rukta hai). */
-export function useKeyboardNav(onSelect: (index: number) => void) {
+export function useKeyboardNav(size: BoardSize, onSelect: (index: number) => void) {
   const [focused, setFocused] = useState(0)
 
   const onKeyDown = useCallback(
@@ -20,23 +13,28 @@ export function useKeyboardNav(onSelect: (index: number) => void) {
         return
       }
 
-      const delta = DELTA[event.key]
+      const deltas: Record<string, number> = {
+        ArrowRight: 1,
+        ArrowLeft: -1,
+        ArrowDown: size,
+        ArrowUp: -size,
+      }
+
+      const delta = deltas[event.key]
       if (delta === undefined) return
+
+      const next = index + delta
+      if (next < 0 || next >= size * size) return
 
       // Horizontal move row ke andar hi rehna chahiye.
       const horizontal = Math.abs(delta) === 1
-      const next = index + delta
-      if (next < 0 || next >= SQUARES) return
-      if (horizontal && Math.floor(next / SIZE) !== Math.floor(index / SIZE)) return
+      if (horizontal && Math.floor(next / size) !== Math.floor(index / size)) return
 
       event.preventDefault()
       setFocused(next)
-      const target = document.querySelector<HTMLButtonElement>(
-        `[data-square="${next}"]`,
-      )
-      target?.focus()
+      document.querySelector<HTMLButtonElement>(`[data-square="${next}"]`)?.focus()
     },
-    [onSelect],
+    [size, onSelect],
   )
 
   return { focused, onKeyDown }

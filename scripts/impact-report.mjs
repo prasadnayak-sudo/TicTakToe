@@ -5,7 +5,7 @@
  * wo nikaal ke ek markdown report + graph banata hai, jo PR pe comment hota hai.
  *
  * Env: CHANGED_FILES -> newline-separated changed files (git diff se)
- * Output: stdout pe markdown
+ * Output: stdout pe markdown (English)
  */
 import {
   allDependents,
@@ -16,6 +16,7 @@ import {
   isTest,
   short,
 } from './lib/graph.mjs';
+import { MERMAID_LEGEND, buildMermaid } from './lib/mermaid.mjs';
 
 const changed = (process.env.CHANGED_FILES || '')
   .split('\n')
@@ -24,7 +25,7 @@ const changed = (process.env.CHANGED_FILES || '')
   .filter(isSource);
 
 if (changed.length === 0) {
-  console.log('_Koi source (.ts/.tsx/.js/.jsx) file change nahi hui — impact analysis skip._');
+  console.log('_No source files (.ts/.tsx/.js/.jsx) changed — impact analysis skipped._');
   process.exit(0);
 }
 
@@ -35,9 +36,9 @@ try {
   // Asli wajah PR comment aur CI log dono mein dikhao, warna debug karna namumkin hai.
   const detail = errorDetail(e);
   console.error(detail);
-  console.log('⚠️ Dependency graph nahi ban paaya. depcruise install/config check karo.');
+  console.log('⚠️ Could not build the dependency graph. Check the depcruise install and config.');
   console.log('');
-  console.log('<details><summary>Asli error</summary>');
+  console.log('<details><summary>Actual error</summary>');
   console.log('');
   console.log('```');
   console.log(detail);
@@ -49,67 +50,66 @@ try {
 
 const index = dependentsIndex(graph);
 
-// Mermaid mein node id bare identifier hona chahiye — quoted string ko wo label
-// ki tarah nahi, syntax error ki tarah padhta hai. Isliye har file ko ek safe
-// id (n0, n1, ...) dete hain aur label sirf ek baar define karte hain.
-const nodeIds = new Map();
-const nodeDefs = [];
-function mermaidNode(file) {
-  if (!nodeIds.has(file)) {
-    const id = `n${nodeIds.size}`;
-    nodeIds.set(file, id);
-    nodeDefs.push(`  ${id}["${short(file).replace(/"/g, '#quot;')}"]`);
-  }
-  return nodeIds.get(file);
-}
-
 let md = '## 🔎 PR Impact Analysis\n\n';
-md += `Is PR mein **${changed.length}** source file change hui hain. Merge se pehle neeche waale areas verify kar lena.\n\n`;
+md += `This PR changes **${changed.length}** source file${changed.length === 1 ? '' : 's'}. Verify the areas below before merging.\n\n`;
+
+// Sabse bade blast radius wali file upar — wahi sabse zyada dhyaan maangti hai.
+const ranked = changed
+  .map((file) => {
+    const deps = allDependents(index, file);
+    return {
+      file,
+      deps,
+      tests: [...deps].filter(isTest),
+      nonTests: [...deps].filter((d) => !isTest(d)),
+    };
+  })
+  .sort((a, b) => b.deps.size - a.deps.size);
 
 const globalAffected = new Set();
-const graphEdges = [];
+const isolated = [];
 
-for (const file of changed) {
-  const deps = allDependents(index, file);
+for (const { file, deps, tests, nonTests } of ranked) {
   deps.forEach((d) => globalAffected.add(d));
-  const tests = [...deps].filter(isTest);
-  const nonTests = [...deps].filter((d) => !isTest(d));
 
-  md += `### \`${short(file)}\`\n`;
   if (deps.size === 0) {
-    md += '- ✅ Koi file isko import nahi karti — isolated change.\n\n';
+    isolated.push(file);
     continue;
   }
-  md += `- **${nonTests.length}** file directly/indirectly affected\n`;
+
+  md += `### \`${short(file)}\`\n`;
+  md += `- **${nonTests.length}** file${nonTests.length === 1 ? '' : 's'} affected directly or indirectly\n`;
   nonTests.slice(0, 12).forEach((d) => (md += `  - \`${short(d)}\`\n`));
-  if (nonTests.length > 12) md += `  - _...aur ${nonTests.length - 12} aur_\n`;
+  if (nonTests.length > 12) md += `  - _...and ${nonTests.length - 12} more_\n`;
   if (tests.length) {
-    md += `- 🧪 **${tests.length}** test file is chain mein — zaroor verify karo\n`;
+    md += `- 🧪 **${tests.length}** test file${tests.length === 1 ? '' : 's'} in this chain — make sure they pass\n`;
   }
   md += '\n';
-
-  // Arrow importer se changed file ki taraf jaata hai, kyunki import ki
-  // direction wahi hai. Graph chhota rakhne ke liye per file 8 edge.
-  [...deps].slice(0, 8).forEach((d) => {
-    graphEdges.push(`  ${mermaidNode(d)} --> ${mermaidNode(file)}`);
-  });
 }
 
-// Mermaid graph (GitHub PR comment mein render hota hai)
-if (graphEdges.length) {
+// Isolated files ko ek line mein samet do, warna wo asli impact ko dabaa deti hain.
+if (isolated.length) {
+  md += `### ✅ Isolated changes (${isolated.length})\n\n`;
+  md += 'Nothing imports these: ';
+  md += isolated.map((f) => `\`${short(f)}\``).join(', ');
+  md += '\n\n';
+}
+
+const diagram = buildMermaid({ graph, dependents: index, changed });
+if (diagram) {
   md += '### 🕸️ Dependency graph\n\n';
-  md += '_Arrow ka matlab: **A --> B** yaani A, B ko import karta hai._\n\n';
-  md += '```mermaid\ngraph LR\n' +
-    nodeDefs.join('\n') + '\n' +
-    [...new Set(graphEdges)].join('\n') +
-    '\n```\n\n';
+  md += MERMAID_LEGEND + '\n\n';
+  md += '```mermaid\n' + diagram.body + '\n```\n\n';
+  if (diagram.truncated) {
+    md += `_Only ${diagram.nodeCount} files are shown — the rest were trimmed to keep the diagram readable._\n\n`;
+  }
 }
 
 md += '---\n';
 md += `**Total unique files affected:** ${globalAffected.size}\n\n`;
 if (globalAffected.size > 40) {
-  md += '> ⚠️ **Bada blast radius (40+ files)** — extra dhyaan se review karo.\n\n';
+  md += '> ⚠️ **Large blast radius (40+ files)** — review with extra care.\n\n';
 }
-md += '_Automated analysis. Copilot review ke saath dono dekh ke verify karna._';
+md += '_Automated analysis. Read it alongside the Copilot review, not instead of it._';
 
 console.log(md);

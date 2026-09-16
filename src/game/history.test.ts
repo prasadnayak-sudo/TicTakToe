@@ -10,7 +10,7 @@ const history: Move[] = [
 
 describe('boardFromHistory', () => {
   it('chaalon ko replay karke board banata hai', () => {
-    const board = boardFromHistory(history)
+    const board = boardFromHistory(history, 3)
     expect(board[4]).toBe('X')
     expect(board[0]).toBe('O')
     expect(board[8]).toBe('X')
@@ -18,7 +18,7 @@ describe('boardFromHistory', () => {
   })
 
   it('khaali history pe khaali board', () => {
-    expect(boardFromHistory([]).every((s) => s === null)).toBe(true)
+    expect(boardFromHistory([], 3).every((s) => s === null)).toBe(true)
   })
 })
 
@@ -56,5 +56,13 @@ describe('jumpTo', () => {
   it('range ke bahar ke step clamp hote hain', () => {
     expect(jumpTo(history, 99)).toHaveLength(3)
     expect(jumpTo(history, -5)).toHaveLength(0)
+  })
+})
+
+describe('boardFromHistory — 4x4', () => {
+  it('bade board par bhi sahi jagah chaal rakhta hai', () => {
+    const board = boardFromHistory([{ index: 15, player: 'O' }], 4)
+    expect(board).toHaveLength(16)
+    expect(board[15]).toBe('O')
   })
 })

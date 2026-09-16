@@ -51,14 +51,24 @@
 }
 
 .board {
+  /* Columns board ke size se aati hain — 3x3 aur 4x4 dono ek hi rule se. */
+  --square: 96px;
   display: grid;
-  grid-template-columns: repeat(3, 96px);
-  grid-template-rows: repeat(3, 96px);
+  grid-template-columns: repeat(var(--board-size, 3), var(--square));
+  grid-template-rows: repeat(var(--board-size, 3), var(--square));
   gap: 8px;
 
   @media (max-width: 1024px) {
-    grid-template-columns: repeat(3, 76px);
-    grid-template-rows: repeat(3, 76px);
+    --square: 76px;
+  }
+}
+
+/* 4x4 par squares chhote, warna mobile pe board screen se bahar chala jaata hai. */
+.board[style*='--board-size: 4'] {
+  --square: 78px;
+
+  @media (max-width: 1024px) {
+    --square: 62px;
   }
 }
 

@@ -1,13 +1,14 @@
 import { cn } from '../lib/cn'
 import { moveLabel } from '../lib/format'
-import type { Move } from '../types/game'
+import type { BoardSize, Move } from '../types/game'
 
 type Props = {
   history: Move[]
+  size: BoardSize
   onJump: (step: number) => void
 }
 
-export function MoveHistory({ history, onJump }: Props) {
+export function MoveHistory({ history, size, onJump }: Props) {
   return (
     <div className="panel">
       <h2>Moves</h2>
@@ -22,7 +23,7 @@ export function MoveHistory({ history, onJump }: Props) {
                 className={cn('link-button', step === history.length - 1 && 'current')}
                 onClick={() => onJump(step + 1)}
               >
-                {moveLabel(move, step)}
+                {moveLabel(move, step, size)}
               </button>
             </li>
           ))}
