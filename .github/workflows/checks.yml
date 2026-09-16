@@ -1,0 +1,46 @@
+name: Checks
+
+# Ye job branch protection ka required check hai — merge isi par rukta hai.
+#
+# Push aur pull_request dono par chalta hai. Dono isliye ki agar PR
+# GITHUB_TOKEN se bane (jab AUTOMATION_PAT set na ho), to pull_request wale
+# workflows trigger nahi hote; push wala run phir bhi commit par check laga
+# deta hai, aur gate bana rehta hai.
+on:
+  push:
+  pull_request:
+    branches: [main, dev]
+
+# Ek hi branch par tezi se kiye gaye pushes mein purana run cancel ho jaye.
+# Group mein event_name isliye hai taaki push aur pull_request ek doosre ko
+# cancel na karein — cancel hua check "success" nahi ginta aur merge rok deta hai.
+concurrency:
+  group: checks-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      # tsc -b, kyunki root tsconfig.json solution-style hai ("files": []).
+      # `tsc --noEmit` us setup mein ek bhi file check nahi karta.
+      - name: TypeScript
+        run: npx tsc -b
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Tests
+        run: npm test
