@@ -7,49 +7,33 @@
  * Env: CHANGED_FILES -> newline-separated changed files (git diff se)
  * Output: stdout pe markdown
  */
-import { execSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import {
+  allDependents,
+  buildGraph,
+  dependentsIndex,
+  errorDetail,
+  isSource,
+  isTest,
+  short,
+} from './lib/graph.mjs';
 
 const changed = (process.env.CHANGED_FILES || '')
   .split('\n')
   .map((f) => f.trim())
   .filter(Boolean)
-  .filter((f) => /\.(ts|tsx|js|jsx)$/.test(f))
-  .filter((f) => !f.includes('node_modules'));
+  .filter(isSource);
 
 if (changed.length === 0) {
   console.log('_Koi source (.ts/.tsx/.js/.jsx) file change nahi hui — impact analysis skip._');
   process.exit(0);
 }
 
-// Config ka naam branch ke hisaab se alag ho sakta hai (dotted/undotted),
-// isliye jo maujood ho wahi use karo.
-const CONFIG_CANDIDATES = [
-  '.dependency-cruiser.cjs',
-  'dependency-cruiser.cjs',
-  '.dependency-cruiser.js',
-  '.dependency-cruiser.json',
-];
-const config = CONFIG_CANDIDATES.find((f) => existsSync(f));
-
 let graph;
 try {
-  if (!config) {
-    throw new Error(
-      `Koi dependency-cruiser config nahi mila. Dhoonda: ${CONFIG_CANDIDATES.join(', ')}`
-    );
-  }
-  const out = execSync(
-    `npx depcruise src --config ${config} --output-type json`,
-    { encoding: 'utf8', maxBuffer: 1024 * 1024 * 64 }
-  );
-  graph = JSON.parse(out);
+  graph = buildGraph();
 } catch (e) {
   // Asli wajah PR comment aur CI log dono mein dikhao, warna debug karna namumkin hai.
-  const detail = [e.message, e.stderr, e.stdout]
-    .filter(Boolean)
-    .join('\n')
-    .slice(0, 2000);
+  const detail = errorDetail(e);
   console.error(detail);
   console.log('⚠️ Dependency graph nahi ban paaya. depcruise install/config check karo.');
   console.log('');
@@ -63,29 +47,7 @@ try {
   process.exit(0);
 }
 
-// Reverse index: file -> usko import karne waale
-const dependents = new Map();
-for (const mod of graph.modules) {
-  for (const dep of mod.dependencies || []) {
-    if (!dependents.has(dep.resolved)) dependents.set(dep.resolved, new Set());
-    dependents.get(dep.resolved).add(mod.source);
-  }
-}
-
-function allDependents(file) {
-  const seen = new Set();
-  const queue = [file];
-  while (queue.length) {
-    const cur = queue.shift();
-    for (const parent of dependents.get(cur) || []) {
-      if (!seen.has(parent)) { seen.add(parent); queue.push(parent); }
-    }
-  }
-  return seen;
-}
-
-const isTest = (f) => /\.(test|spec)\.(ts|tsx|js|jsx)$/.test(f) || f.includes('__tests__');
-const short = (f) => f.replace(/^src\//, '');
+const index = dependentsIndex(graph);
 
 // Mermaid mein node id bare identifier hona chahiye — quoted string ko wo label
 // ki tarah nahi, syntax error ki tarah padhta hai. Isliye har file ko ek safe
@@ -108,7 +70,7 @@ const globalAffected = new Set();
 const graphEdges = [];
 
 for (const file of changed) {
-  const deps = allDependents(file);
+  const deps = allDependents(index, file);
   deps.forEach((d) => globalAffected.add(d));
   const tests = [...deps].filter(isTest);
   const nonTests = [...deps].filter((d) => !isTest(d));

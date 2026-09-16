@@ -1,0 +1,148 @@
+name: Post-merge Summary
+
+# Merge ke baad chalta hai — PR band hone par, sirf tab jab wo actually merge hua ho.
+on:
+  pull_request:
+    types: [closed]
+    branches: [dev, main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  summary:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Merge ka data ikattha karo
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          {
+            echo "CHANGED_FILES<<GHEOF"
+            git diff --name-only "$BASE_SHA...$HEAD_SHA"
+            echo "GHEOF"
+            echo "COMMIT_LINES<<GHEOF"
+            git log --format='%s' "$BASE_SHA..$HEAD_SHA"
+            echo "GHEOF"
+          } >> "$GITHUB_ENV"
+
+          # Diff AI ko bhejne ke liye — lock file bahar, aur size capped,
+          # warna prompt bahut bada ho jata hai.
+          git diff "$BASE_SHA...$HEAD_SHA" -- . ':(exclude)package-lock.json' \
+            | head -c 60000 > /tmp/diff.txt
+
+      # Ye hissa hamesha chalta hai — AI ke bharose nahi hai.
+      - name: Deterministic summary banao
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: node scripts/merge-summary.mjs > /tmp/summary.md
+
+      - name: Copilot available hai ya nahi, check karo
+        id: check
+        env:
+          COPILOT_PAT: ${{ secrets.COPILOT_PAT }}
+        run: |
+          if [ -n "$COPILOT_PAT" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "COPILOT_PAT secret set nahi hai — sirf deterministic summary aayegi." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Copilot ke liye prompt banao
+        if: steps.check.outputs.enabled == 'true'
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          {
+            echo "Neeche ek merge ho chuke pull request ka diff hai."
+            echo "Iska summary Hinglish (Roman Hindi + English technical terms) mein likho."
+            echo
+            echo "Format:"
+            echo "- 2-3 line: is merge ne kya badla, business/user ke nazariye se."
+            echo "- '### Kya dhyaan rakhna hai' heading ke neeche 2-4 bullet:"
+            echo "  risky cheezein, missing tests, ya follow-up jo zaroori lage."
+            echo "- Agar koi behaviour change hua ho to usko alag se batao."
+            echo
+            echo "Rules: jo diff mein hai sirf wahi likho, guess mat karo."
+            echo "Headings mein '##' se bada mat use karo. Diff dobara paste mat karo."
+            echo
+            echo "PR title: $PR_TITLE"
+            echo
+            echo "PR description:"
+            echo "$PR_BODY"
+            echo
+            echo "Diff:"
+            echo '```diff'
+            cat /tmp/diff.txt
+            echo '```'
+          } > /tmp/prompt.txt
+
+      - name: Copilot CLI install karo
+        if: steps.check.outputs.enabled == 'true'
+        run: npm install -g @github/copilot
+
+      # AI fail ho jaye to bhi summary post honi chahiye — isliye continue-on-error.
+      - name: Copilot se summary maango
+        id: ai
+        if: steps.check.outputs.enabled == 'true'
+        continue-on-error: true
+        uses: actions/ai-inference@v1
+        with:
+          prompt-file: /tmp/prompt.txt
+          model: claude-sonnet-4.5
+          system-prompt: >-
+            Tum ek senior engineer ho jo merge ho chuke changes ka chhota,
+            seedha summary likhta hai. Hinglish mein likho. Sirf wahi batao jo
+            diff se pakka pata chalta ho.
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
+
+      - name: Copilot ka hissa jodo
+        if: steps.ai.outcome == 'success' && steps.ai.outputs.response != ''
+        env:
+          AI_RESPONSE: ${{ steps.ai.outputs.response }}
+        run: |
+          {
+            echo
+            echo "### 🤖 Copilot ka summary"
+            echo
+            echo "$AI_RESPONSE"
+          } >> /tmp/summary.md
+
+      - name: AI fail hua to bata do
+        if: steps.check.outputs.enabled == 'true' && steps.ai.outcome != 'success'
+        run: |
+          {
+            echo
+            echo "_🤖 Copilot summary is baar nahi bani — workflow logs mein 'Copilot se summary maango' step dekho._"
+          } >> /tmp/summary.md
+
+      - name: PR pe comment karo
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: merge-summary
+          number: ${{ github.event.pull_request.number }}
+          path: /tmp/summary.md
+
+      - name: Actions run pe bhi dikhao
+        if: always()
+        run: cat /tmp/summary.md >> "$GITHUB_STEP_SUMMARY"
