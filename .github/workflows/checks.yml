@@ -1,19 +1,14 @@
 name: Checks
 
 # Ye job branch protection ka required check hai — merge isi par rukta hai.
-#
-# Push aur pull_request dono par chalta hai. Dono isliye ki agar PR
-# GITHUB_TOKEN se bane (jab AUTOMATION_PAT set na ho), to pull_request wale
-# workflows trigger nahi hote; push wala run phir bhi commit par check laga
-# deta hai, aur gate bana rehta hai.
 on:
-  push:
   pull_request:
     branches: [main, dev]
+  # Direct push (ya merge) par bhi chale, taaki base branches par
+  # tootey hue commit ka pata chale.
+  push:
+    branches: [main, dev]
 
-# Ek hi branch par tezi se kiye gaye pushes mein purana run cancel ho jaye.
-# Group mein event_name isliye hai taaki push aur pull_request ek doosre ko
-# cancel na karein — cancel hua check "success" nahi ginta aur merge rok deta hai.
 concurrency:
   group: checks-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
