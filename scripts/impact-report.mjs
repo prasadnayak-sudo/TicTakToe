@@ -93,6 +93,16 @@ md += `Is PR mein **${changed.length}** source file change hui hain. Merge se pe
 const globalAffected = new Set();
 const graphEdges = [];
 
+// Mermaid mein node id bare identifier hona chahiye — quoted string ko wo
+// label ki tarah nahi, syntax error ki tarah padhta hai. Isliye har file ko
+// ek safe id (n0, n1, ...) dete hain aur label alag se attach karte hain.
+const nodeIds = new Map();
+function mermaidNode(file) {
+  if (!nodeIds.has(file)) nodeIds.set(file, `n${nodeIds.size}`);
+  const label = short(file).replace(/"/g, '#quot;');
+  return `${nodeIds.get(file)}["${label}"]`;
+}
+
 for (const file of changed) {
   const deps = allDependents(file);
   deps.forEach((d) => globalAffected.add(d));
@@ -114,7 +124,7 @@ for (const file of changed) {
 
   // graph edges (max thoda sa, warna diagram bahut bada)
   [...deps].slice(0, 8).forEach((d) => {
-    graphEdges.push(`  ${JSON.stringify(short(file))} --> ${JSON.stringify(short(d))}`);
+    graphEdges.push(`  ${mermaidNode(file)} --> ${mermaidNode(d)}`);
   });
 }
 
