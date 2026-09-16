@@ -1,9 +1,12 @@
 name: PR Impact Check
 
-# Sirf report banata hai — ye gate nahi hai. Merge ko rokna ho to "Checks"
-# workflow ki `tests` job ko required banao.
+# Builds the impact report, comments it on the PR, and writes a compact
+# version into the PR description so it ends up in the commit message.
+# This is a report only — it is not a gate. To block merges, make the
+# `tests` job in the Checks workflow a required check.
 on:
   pull_request:
+    types: [opened, synchronize, reopened]
     branches: [dev, main]
 
 permissions:
@@ -17,26 +20,46 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
+
       - run: npm ci
+
       - name: Collect changed files
         run: |
           git fetch origin ${{ github.base_ref }} --depth=1
           CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
           {
-            echo "CHANGED_FILES<<EOF"
+            echo "CHANGED_FILES<<GHEOF"
             echo "$CHANGED"
-            echo "EOF"
+            echo "GHEOF"
           } >> "$GITHUB_ENV"
+
       - name: Build the impact report
         run: node scripts/impact-report.mjs > impact.md
         env:
           CHANGED_FILES: ${{ env.CHANGED_FILES }}
+
       - name: Comment on the PR
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           header: pr-impact
           path: impact.md
+
+      # The compact summary goes into the PR description, because GitHub can
+      # copy the description into the squash/merge commit message. The full
+      # report stays in the comment — a mermaid graph is useless in a commit.
+      - name: Write the summary into the PR description
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHANGED_FILES: ${{ env.CHANGED_FILES }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          SUMMARY="$(node scripts/commit-summary.mjs)"
+          export SUMMARY
+          node scripts/update-pr-body.mjs > /tmp/body.md
+          gh pr edit "$PR_NUMBER" --body-file /tmp/body.md
