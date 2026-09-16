@@ -45,49 +45,15 @@ function App() {
   return (
     <>
       <section id="center">
-        <div>
+        <div className="header">
           <h1>Tic Tac</h1>
-          <div className="modes" role="group" aria-label="Game mode">
-            <button
-              type="button"
-              className="mode"
-              aria-pressed={mode === 'two-player'}
-              onClick={() => switchMode('two-player')}
-            >
-              2 players
-            </button>
-            <button
-              type="button"
-              className="mode"
-              aria-pressed={mode === 'computer'}
-              onClick={() => switchMode('computer')}
-            >
-              vs computer
-            </button>
-          </div>
-        </div>
-
-        <p className="status" role="status">
-          {status}
-        </p>
-
-        <div className="board">
-          {board.map((square, i) => (
-            <button
-              key={i}
-              type="button"
-              className={`square${
-                result.status === 'won' && result.line.includes(i)
-                  ? ' winning'
-                  : ''
-              }`}
-              disabled={!!square || over || computerTurn}
-              aria-label={square ? `Square ${i + 1}: ${square}` : `Square ${i + 1}: empty`}
-              onClick={() => play(i)}
-            >
-              {square}
-            </button>
-          ))}
+          <ModeSelector mode={game.mode} onChange={game.setMode} />
+          {game.mode === 'computer' && (
+            <DifficultySelector
+              difficulty={game.difficulty}
+              onChange={game.setDifficulty}
+            />
+          )}
         </div>
 
         <StatusBar
