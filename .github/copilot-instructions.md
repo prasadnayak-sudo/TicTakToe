@@ -1,58 +1,74 @@
 # Copilot Instructions — Tic Tac Toe (React + TypeScript + Vite)
 
-Ye rules Copilot review aur suggestions ko is project ke hisaab se guide karte hain.
+These rules steer Copilot's reviews and suggestions for this project.
 
-## Project ka asli shape
+## What this project actually is
 
-- **React 19 + TypeScript + Vite.** Koi Tailwind nahi, koi UI library nahi.
-- **Styling** plain CSS hai. Colors/spacing `src/index.css` ke CSS variables se
-  aate hain (`--accent`, `--text-h`, `--border`, ...). Dark mode `prefers-color-scheme`
-  se chalta hai — hardcoded color flag karo, variable use karwao.
-- **Koi API layer nahi.** Saara state client-side hai; persistence sirf
-  `localStorage` (`src/lib/storage.ts`) se hoti hai.
-- Class names jodne ke liye `cn()` helper hai (`src/lib/cn.ts`).
+- **React 19 + TypeScript + Vite.** No Tailwind, no UI library.
+- **Plain CSS.** Colours and spacing come from CSS variables in
+  `src/index.css` (`--accent`, `--text-h`, `--border`, ...). Dark mode runs off
+  `prefers-color-scheme`. Flag hardcoded colours and ask for a variable.
+- **No API layer.** All state is client-side; the only persistence is
+  `localStorage` via `src/lib/storage.ts`.
+- `cn()` in `src/lib/cn.ts` joins class names.
+- **Board size is 3x3 or 4x4.** Nothing may assume 3. Size comes from the
+  board's length (`sizeOf`), and win lines are generated per size by
+  `linesFor`. A hardcoded `3`, `9`, or `% 3` in new code is a bug.
 
-## Layers (ye order tod-na review mein flag karo)
+## Layers (flag anything that breaks this order)
 
 ```
 types/  <-  lib/  <-  game/  <-  hooks/  <-  components/  <-  App.tsx
 ```
 
-- `src/types/game.ts` — saare shared types. **Sabse bada blast radius** (18+ files).
-  Isme koi bhi change ho to review extra dhyaan se ho.
-- `src/lib/` — framework-free helpers (`cn`, `storage`, `format`). React import
-  yahan nahi aana chahiye.
-- `src/game/` — **pure logic**: board, minimax AI, history, stats. Koi React,
-  koi DOM, koi side effect nahi. Har function naya object lautaye, input mutate na kare.
-- `src/hooks/` — React state. `game/` ki logic yahan duplicate na ho.
-- `src/components/` — presentational. Game rules components mein na likhe jaayein.
+- `src/types/game.ts` — every shared type. **Widest blast radius in the repo
+  (~19 files).** Review changes here with extra care.
+- `src/lib/` — framework-free helpers (`cn`, `storage`, `format`). No React
+  imports belong here.
+- `src/game/` — **pure logic**: board, minimax AI, history, stats. No React, no
+  DOM, no side effects. Every function returns a new object and never mutates
+  its input.
+- `src/hooks/` — React state. Logic that belongs in `game/` must not be
+  duplicated here.
+- `src/components/` — presentational. Game rules do not belong in components.
 
-## Review karte waqt ye dekho
+## What to look for in review
 
-- **Blast radius** — `types/`, `lib/` ya `game/` ki koi file badli ho to batao
-  kaun-kaun affected hai (PR pe impact report comment already aata hai).
-- **Pure logic mein purity** — `src/game/` ka koi function board/stats/history
-  mutate kare, ya `Math.random`/`Date` pe depend kare (AI difficulty ke alawa),
-  to flag karo — wo test ko flaky banata hai.
-- **Type safety** — `any` flag karo. Result/Move/Stats jaise discriminated
-  unions pe exhaustive handling check karo (switch mein saare cases).
-- **React** — missing dependency arrays (`useEffect`, `useMemo`, `useCallback`),
-  effect cleanup (timers zaroor clear hone chahiye), list keys.
-- **Accessibility** — squares pe `aria-label`, toggles pe `aria-pressed`,
-  status pe `role="status"`, keyboard navigation (`useKeyboardNav`) na tootey.
-- **localStorage** — har access try/catch mein ho (private mode mein throw karta hai).
-- **Tests** — `src/game/` ya `src/lib/` ki logic badle aur uska test na badle,
-  to test maango. Runner vitest hai, tests file ke saath `*.test.ts` mein rehte hain.
+- **Blast radius.** When a file in `types/`, `lib/` or `game/` changes, say what
+  it affects. The PR already gets an impact report comment with a dependency
+  graph — read it.
+- **Purity in `src/game/`.** Flag anything that mutates a board, stats or
+  history object, or that depends on `Math.random` / `Date` outside the AI's
+  difficulty handling. Those make tests flaky.
+- **Board size assumptions.** Any new `3`, `9`, `SIZE`-like constant, or
+  index maths that only works on a 3x3 grid.
+- **AI search cost.** `bestMove` only runs a full minimax when there are few
+  enough empty squares; beyond that it is depth-limited. Raising that limit or
+  removing alpha-beta pruning will hang a 4x4 game — flag it.
+- **Type safety.** Flag `any`. Check that discriminated unions (`Result`,
+  `Move`, `Stats`) are handled exhaustively in every `switch`.
+- **React.** Missing dependency arrays (`useEffect`, `useMemo`, `useCallback`),
+  effect cleanup (timers must be cleared), list keys.
+- **Accessibility.** `aria-label` on squares, `aria-pressed` on toggles,
+  `role="status"` on the status line, and keyboard navigation
+  (`useKeyboardNav`) must keep working.
+- **localStorage.** Every access goes through a try/catch — it throws in
+  private mode. Keys are per mode and per board size; a key that drops either
+  will show the wrong stats.
+- **Tests.** If logic in `src/game/` or `src/lib/` changes and no test changes
+  with it, ask for one. The runner is vitest and tests sit next to the file as
+  `*.test.ts` (56 of them today).
 
-## Suggestion dete waqt
+## When suggesting changes
 
-- Existing patterns follow karo (dekho paas ki files kaise likhi gayi hain).
-- Colors ke liye CSS variables, hardcoded hex nahi.
-- Naye types banane ki jagah `src/types/game.ts` ke existing types reuse karo.
-- Comments sirf wahan jahan "kyun" samajhna zaroori ho — "kya" ho raha hai wo code se dikhna chahiye.
+- Follow the patterns already in the neighbouring files.
+- CSS variables for colours, never a hardcoded hex.
+- Reuse the existing types in `src/types/game.ts` instead of adding new ones.
+- Comment only where the "why" is not obvious — the "what" should be readable
+  from the code.
 
-## Kya na karo
+## Do not
 
-- Bina zaroorat naye dependencies mat suggest karo.
-- Bade refactor tab tak mat suggest karo jab tak explicitly na maanga jaaye.
-- Game logic ko components mein mat kheencho — wo `src/game/` mein hi rahegi.
+- Suggest new dependencies without a clear need.
+- Suggest large refactors unless they were explicitly asked for.
+- Pull game logic into components — it stays in `src/game/`.
