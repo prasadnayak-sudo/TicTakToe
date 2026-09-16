@@ -1,11 +1,11 @@
-import { EMPTY_BOARD, applyMove, other } from './board'
-import type { Board, Mode, Move, Player } from '../types/game'
+import { applyMove, emptyBoard, other } from './board'
+import type { Board, BoardSize, Mode, Move, Player } from '../types/game'
 
 /** History ko replay karke board banata hai — board kabhi alag se store nahi hota. */
-export function boardFromHistory(history: Move[]): Board {
+export function boardFromHistory(history: Move[], size: BoardSize): Board {
   return history.reduce<Board>(
     (board, move) => applyMove(board, move.index, move.player),
-    EMPTY_BOARD,
+    emptyBoard(size),
   )
 }
 

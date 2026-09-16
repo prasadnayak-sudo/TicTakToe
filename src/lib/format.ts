@@ -1,16 +1,14 @@
-import type { Move, Player } from '../types/game'
+import type { BoardSize, Move, Player } from '../types/game'
 
-const SIZE = 3
-
-/** 0-8 index ko "r2c3" jaise human-readable coordinate mein badalta hai. */
-export function squareLabel(index: number): string {
-  const row = Math.floor(index / SIZE) + 1
-  const col = (index % SIZE) + 1
+/** 0-based index ko "r2c3" jaise human-readable coordinate mein badalta hai. */
+export function squareLabel(index: number, size: BoardSize): string {
+  const row = Math.floor(index / size) + 1
+  const col = (index % size) + 1
   return `r${row}c${col}`
 }
 
-export function moveLabel(move: Move, step: number): string {
-  return `${step + 1}. ${move.player} → ${squareLabel(move.index)}`
+export function moveLabel(move: Move, step: number, size: BoardSize): string {
+  return `${step + 1}. ${move.player} → ${squareLabel(move.index, size)}`
 }
 
 export function percent(value: number): string {
@@ -19,4 +17,9 @@ export function percent(value: number): string {
 
 export function playerLabel(player: Player, isComputer: boolean): string {
   return isComputer ? `Computer (${player})` : player
+}
+
+/** "3×3" jaisa label — selector aur stats key dono jagah use hota hai. */
+export function sizeLabel(size: BoardSize): string {
+  return `${size}×${size}`
 }

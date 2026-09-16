@@ -1,5 +1,39 @@
-import { applyMove, emptySquares, getResult, other } from './board'
+import { applyMove, emptySquares, getResult, linesFor, other, sizeOf } from './board'
 import type { Board, Difficulty, Player } from '../types/game'
+
+/**
+ * Itne khaali squares tak poora search chalta hai (perfect play). 3x3 hamesha
+ * isme aa jaata hai; 4x4 sirf endgame mein. Usse pehle depth-limited search
+ * chalta hai, kyunki 16 squares ka full tree 20 trillion se bada hai.
+ */
+const FULL_SEARCH_SQUARES = 9
+const MAX_DEPTH = 4
+
+const WIN_SCORE = 1000
+
+/**
+ * Adhoori lines ko score karta hai: jitni marks ek hi player ki ho aur line
+ * blocked na ho, utni wo line keemti hai.
+ */
+function evaluate(board: Board, player: Player): number {
+  const opponent = other(player)
+  let score = 0
+
+  for (const line of linesFor(sizeOf(board))) {
+    let mine = 0
+    let theirs = 0
+    for (const i of line) {
+      if (board[i] === player) mine++
+      else if (board[i] === opponent) theirs++
+    }
+    // Mili-juli line kisi ke kaam ki nahi — dono block kar chuke hain.
+    if (mine > 0 && theirs > 0) continue
+    if (mine > 0) score += 10 ** mine
+    else if (theirs > 0) score -= 10 ** theirs
+  }
+
+  return score
+}
 
 /**
  * Score `player` ke nazariye se. Gehri jeet ki value kam rakhi hai taaki AI
@@ -10,26 +44,63 @@ function minimax(
   toMove: Player,
   player: Player,
   depth: number,
+  limit: number,
+  alpha: number,
+  beta: number,
 ): number {
   const result = getResult(board)
   if (result.status === 'won') {
-    return result.winner === player ? 10 - depth : depth - 10
+    return result.winner === player ? WIN_SCORE - depth : depth - WIN_SCORE
   }
   if (result.status === 'draw') return 0
+  if (depth >= limit) return evaluate(board, player)
 
-  const scores = emptySquares(board).map((i) =>
-    minimax(applyMove(board, i, toMove), other(toMove), player, depth + 1),
-  )
+  const maximising = toMove === player
+  let best = maximising ? -Infinity : Infinity
 
-  return toMove === player ? Math.max(...scores) : Math.min(...scores)
+  for (const i of emptySquares(board)) {
+    const score = minimax(
+      applyMove(board, i, toMove),
+      other(toMove),
+      player,
+      depth + 1,
+      limit,
+      alpha,
+      beta,
+    )
+
+    if (maximising) {
+      best = Math.max(best, score)
+      alpha = Math.max(alpha, best)
+    } else {
+      best = Math.min(best, score)
+      beta = Math.min(beta, best)
+    }
+    // Is branch ka natija upar wale player kabhi chunega hi nahi.
+    if (beta <= alpha) break
+  }
+
+  return best
 }
 
-/** Perfect move. Board bhara ho to null. */
+/** Perfect (ya 4x4 par sabse achhi dikhne wali) move. Board bhara ho to null. */
 export function bestMove(board: Board, player: Player): number | null {
-  let best: { move: number; score: number } | null = null
+  const options = emptySquares(board)
+  if (options.length === 0) return null
 
-  for (const move of emptySquares(board)) {
-    const score = minimax(applyMove(board, move, player), other(player), player, 0)
+  const limit = options.length <= FULL_SEARCH_SQUARES ? Infinity : MAX_DEPTH
+
+  let best: { move: number; score: number } | null = null
+  for (const move of options) {
+    const score = minimax(
+      applyMove(board, move, player),
+      other(player),
+      player,
+      0,
+      limit,
+      -Infinity,
+      Infinity,
+    )
     if (!best || score > best.score) best = { move, score }
   }
 

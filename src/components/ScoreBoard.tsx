@@ -1,15 +1,16 @@
 import { totalGames, winRate } from '../game/stats'
-import { percent, playerLabel } from '../lib/format'
-import type { Mode, Stats } from '../types/game'
+import { percent, playerLabel, sizeLabel } from '../lib/format'
+import type { BoardSize, Mode, Stats } from '../types/game'
 
 type Props = {
   stats: Stats
   mode: Mode
+  size: BoardSize
   computer: string
   onReset: () => void
 }
 
-export function ScoreBoard({ stats, mode, computer, onReset }: Props) {
+export function ScoreBoard({ stats, mode, size, computer, onReset }: Props) {
   const vsComputer = mode === 'computer'
 
   return (
@@ -20,7 +21,10 @@ export function ScoreBoard({ stats, mode, computer, onReset }: Props) {
           Reset
         </button>
       </div>
-      <p className="muted">{totalGames(stats)} games khele</p>
+      <p className="muted">
+        {sizeLabel(size)} · {vsComputer ? 'vs computer' : '2 players'} ·{' '}
+        {totalGames(stats)} games
+      </p>
 
       <ul className="scores">
         <li>
