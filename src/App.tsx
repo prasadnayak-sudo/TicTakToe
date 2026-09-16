@@ -47,7 +47,7 @@ function App() {
     <>
       <section id="center">
         <div className="header">
-          <h1>Tic Tac</h1>
+          <h1> Tac</h1>
           <ModeSelector mode={game.mode} onChange={game.setMode} />
           <BoardSizeSelector size={game.size} onChange={game.setSize} />
           {game.mode === 'computer' && (
