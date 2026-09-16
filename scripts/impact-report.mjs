@@ -8,6 +8,7 @@
  * Output: stdout pe markdown
  */
 import { execSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 
 const changed = (process.env.CHANGED_FILES || '')
   .split('\n')
@@ -21,15 +22,44 @@ if (changed.length === 0) {
   process.exit(0);
 }
 
+// Config ka naam branch ke hisaab se alag ho sakta hai (dotted/undotted),
+// isliye jo maujood ho wahi use karo.
+const CONFIG_CANDIDATES = [
+  '.dependency-cruiser.cjs',
+  'dependency-cruiser.cjs',
+  '.dependency-cruiser.js',
+  '.dependency-cruiser.json',
+];
+const config = CONFIG_CANDIDATES.find((f) => existsSync(f));
+
 let graph;
 try {
+  if (!config) {
+    throw new Error(
+      `Koi dependency-cruiser config nahi mila. Dhoonda: ${CONFIG_CANDIDATES.join(', ')}`
+    );
+  }
   const out = execSync(
-    'npx depcruise src --config .dependency-cruiser.cjs --output-type json',
+    `npx depcruise src --config ${config} --output-type json`,
     { encoding: 'utf8', maxBuffer: 1024 * 1024 * 64 }
   );
   graph = JSON.parse(out);
 } catch (e) {
+  // Asli wajah PR comment aur CI log dono mein dikhao, warna debug karna namumkin hai.
+  const detail = [e.message, e.stderr, e.stdout]
+    .filter(Boolean)
+    .join('\n')
+    .slice(0, 2000);
+  console.error(detail);
   console.log('⚠️ Dependency graph nahi ban paaya. depcruise install/config check karo.');
+  console.log('');
+  console.log('<details><summary>Asli error</summary>');
+  console.log('');
+  console.log('```');
+  console.log(detail);
+  console.log('```');
+  console.log('');
+  console.log('</details>');
   process.exit(0);
 }
 
@@ -57,6 +87,20 @@ function allDependents(file) {
 const isTest = (f) => /\.(test|spec)\.(ts|tsx|js|jsx)$/.test(f) || f.includes('__tests__');
 const short = (f) => f.replace(/^src\//, '');
 
+// Mermaid mein node id bare identifier hona chahiye — quoted string ko wo label
+// ki tarah nahi, syntax error ki tarah padhta hai. Isliye har file ko ek safe
+// id (n0, n1, ...) dete hain aur label sirf ek baar define karte hain.
+const nodeIds = new Map();
+const nodeDefs = [];
+function mermaidNode(file) {
+  if (!nodeIds.has(file)) {
+    const id = `n${nodeIds.size}`;
+    nodeIds.set(file, id);
+    nodeDefs.push(`  ${id}["${short(file).replace(/"/g, '#quot;')}"]`);
+  }
+  return nodeIds.get(file);
+}
+
 let md = '## 🔎 PR Impact Analysis\n\n';
 md += `Is PR mein **${changed.length}** source file change hui hain. Merge se pehle neeche waale areas verify kar lena.\n\n`;
 
@@ -82,16 +126,21 @@ for (const file of changed) {
   }
   md += '\n';
 
-  // graph edges (max thoda sa, warna diagram bahut bada)
+  // Arrow importer se changed file ki taraf jaata hai, kyunki import ki
+  // direction wahi hai. Graph chhota rakhne ke liye per file 8 edge.
   [...deps].slice(0, 8).forEach((d) => {
-    graphEdges.push(`  ${JSON.stringify(short(file))} --> ${JSON.stringify(short(d))}`);
+    graphEdges.push(`  ${mermaidNode(d)} --> ${mermaidNode(file)}`);
   });
 }
 
 // Mermaid graph (GitHub PR comment mein render hota hai)
 if (graphEdges.length) {
-  md += '### 🕸️ Dependency graph (kaun kis pe depend karta hai)\n\n';
-  md += '```mermaid\ngraph LR\n' + graphEdges.join('\n') + '\n```\n\n';
+  md += '### 🕸️ Dependency graph\n\n';
+  md += '_Arrow ka matlab: **A --> B** yaani A, B ko import karta hai._\n\n';
+  md += '```mermaid\ngraph LR\n' +
+    nodeDefs.join('\n') + '\n' +
+    [...new Set(graphEdges)].join('\n') +
+    '\n```\n\n';
 }
 
 md += '---\n';
