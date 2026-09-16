@@ -56,4 +56,4 @@ jobs:
       - name: Lint
         run: npm run lint --if-present
       - name: Tests
-        run: npm test --if-present -- --watchAll=false
+        run: npm test --if-present
