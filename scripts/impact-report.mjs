@@ -87,21 +87,25 @@ function allDependents(file) {
 const isTest = (f) => /\.(test|spec)\.(ts|tsx|js|jsx)$/.test(f) || f.includes('__tests__');
 const short = (f) => f.replace(/^src\//, '');
 
+// Mermaid mein node id bare identifier hona chahiye — quoted string ko wo label
+// ki tarah nahi, syntax error ki tarah padhta hai. Isliye har file ko ek safe
+// id (n0, n1, ...) dete hain aur label sirf ek baar define karte hain.
+const nodeIds = new Map();
+const nodeDefs = [];
+function mermaidNode(file) {
+  if (!nodeIds.has(file)) {
+    const id = `n${nodeIds.size}`;
+    nodeIds.set(file, id);
+    nodeDefs.push(`  ${id}["${short(file).replace(/"/g, '#quot;')}"]`);
+  }
+  return nodeIds.get(file);
+}
+
 let md = '## 🔎 PR Impact Analysis\n\n';
 md += `Is PR mein **${changed.length}** source file change hui hain. Merge se pehle neeche waale areas verify kar lena.\n\n`;
 
 const globalAffected = new Set();
 const graphEdges = [];
-
-// Mermaid mein node id bare identifier hona chahiye — quoted string ko wo
-// label ki tarah nahi, syntax error ki tarah padhta hai. Isliye har file ko
-// ek safe id (n0, n1, ...) dete hain aur label alag se attach karte hain.
-const nodeIds = new Map();
-function mermaidNode(file) {
-  if (!nodeIds.has(file)) nodeIds.set(file, `n${nodeIds.size}`);
-  const label = short(file).replace(/"/g, '#quot;');
-  return `${nodeIds.get(file)}["${label}"]`;
-}
 
 for (const file of changed) {
   const deps = allDependents(file);
@@ -122,16 +126,21 @@ for (const file of changed) {
   }
   md += '\n';
 
-  // graph edges (max thoda sa, warna diagram bahut bada)
+  // Arrow importer se changed file ki taraf jaata hai, kyunki import ki
+  // direction wahi hai. Graph chhota rakhne ke liye per file 8 edge.
   [...deps].slice(0, 8).forEach((d) => {
-    graphEdges.push(`  ${mermaidNode(file)} --> ${mermaidNode(d)}`);
+    graphEdges.push(`  ${mermaidNode(d)} --> ${mermaidNode(file)}`);
   });
 }
 
 // Mermaid graph (GitHub PR comment mein render hota hai)
 if (graphEdges.length) {
-  md += '### 🕸️ Dependency graph (kaun kis pe depend karta hai)\n\n';
-  md += '```mermaid\ngraph LR\n' + graphEdges.join('\n') + '\n```\n\n';
+  md += '### 🕸️ Dependency graph\n\n';
+  md += '_Arrow ka matlab: **A --> B** yaani A, B ko import karta hai._\n\n';
+  md += '```mermaid\ngraph LR\n' +
+    nodeDefs.join('\n') + '\n' +
+    [...new Set(graphEdges)].join('\n') +
+    '\n```\n\n';
 }
 
 md += '---\n';
