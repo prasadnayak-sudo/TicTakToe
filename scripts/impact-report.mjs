@@ -8,6 +8,7 @@
  * Output: stdout pe markdown
  */
 import { execSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 
 const changed = (process.env.CHANGED_FILES || '')
   .split('\n')
@@ -21,15 +22,44 @@ if (changed.length === 0) {
   process.exit(0);
 }
 
+// Config ka naam branch ke hisaab se alag ho sakta hai (dotted/undotted),
+// isliye jo maujood ho wahi use karo.
+const CONFIG_CANDIDATES = [
+  '.dependency-cruiser.cjs',
+  'dependency-cruiser.cjs',
+  '.dependency-cruiser.js',
+  '.dependency-cruiser.json',
+];
+const config = CONFIG_CANDIDATES.find((f) => existsSync(f));
+
 let graph;
 try {
+  if (!config) {
+    throw new Error(
+      `Koi dependency-cruiser config nahi mila. Dhoonda: ${CONFIG_CANDIDATES.join(', ')}`
+    );
+  }
   const out = execSync(
-    'npx depcruise src --config .dependency-cruiser.cjs --output-type json',
+    `npx depcruise src --config ${config} --output-type json`,
     { encoding: 'utf8', maxBuffer: 1024 * 1024 * 64 }
   );
   graph = JSON.parse(out);
 } catch (e) {
+  // Asli wajah PR comment aur CI log dono mein dikhao, warna debug karna namumkin hai.
+  const detail = [e.message, e.stderr, e.stdout]
+    .filter(Boolean)
+    .join('\n')
+    .slice(0, 2000);
+  console.error(detail);
   console.log('⚠️ Dependency graph nahi ban paaya. depcruise install/config check karo.');
+  console.log('');
+  console.log('<details><summary>Asli error</summary>');
+  console.log('');
+  console.log('```');
+  console.log(detail);
+  console.log('```');
+  console.log('');
+  console.log('</details>');
   process.exit(0);
 }
 
