@@ -1,0 +1,59 @@
+name: PR Impact Check
+
+on:
+  pull_request:
+    branches: [dev, main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  # Job 1: impact report banata hai aur PR pe comment karta hai
+  impact:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Changed files nikaalo
+        run: |
+          git fetch origin ${{ github.base_ref }} --depth=1
+          CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+          {
+            echo "CHANGED_FILES<<EOF"
+            echo "$CHANGED"
+            echo "EOF"
+          } >> "$GITHUB_ENV"
+      - name: Impact report banao
+        run: node scripts/impact-report.mjs > impact.md
+        env:
+          CHANGED_FILES: ${{ env.CHANGED_FILES }}
+      - name: PR pe comment karo
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: pr-impact
+          path: impact.md
+
+  # Job 2: ye "tests" job branch protection ka required check banega.
+  # Fail hua to merge block. (abhi tsc + lint; test baad mein add hoga)
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: TypeScript check
+        run: npx tsc --noEmit
+      - name: Lint
+        run: npm run lint --if-present
+      - name: Tests
+        run: npm test --if-present -- --watchAll=false
