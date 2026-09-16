@@ -8,7 +8,9 @@
  * (message mein render hota hi nahi) aur lambi file lists nahi. Poori report
  * PR comment mein alag se aati hai.
  *
- * Env: CHANGED_FILES -> newline-separated changed files
+ * Env:
+ *   CHANGED_FILES  newline-separated changed files
+ *   COMMIT_LINES   newline-separated commit subjects (optional)
  * Output: stdout pe plain markdown
  */
 import {
@@ -20,18 +22,34 @@ import {
   short,
 } from './lib/graph.mjs';
 
-const changed = (process.env.CHANGED_FILES || '')
-  .split('\n')
-  .map((f) => f.trim())
-  .filter(Boolean);
+const lines = (value) =>
+  (value || '')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+const changed = lines(process.env.CHANGED_FILES);
+const commits = lines(process.env.COMMIT_LINES);
 
 const source = changed.filter(isSource);
 const tests = changed.filter(isTest);
 
 const out = [];
-out.push(`Changes ${changed.length} file${changed.length === 1 ? '' : 's'}` +
-  (source.length ? `, ${source.length} of them source` : '') +
-  (tests.length ? `, ${tests.length} test` : '') + '.');
+
+// Kya badla — commit subjects hi sabse seedha jawab hain.
+if (commits.length) {
+  out.push('What changed:');
+  commits.slice(0, 15).forEach((c) => out.push(`- ${c}`));
+  if (commits.length > 15) out.push(`- ...and ${commits.length - 15} more commits`);
+  out.push('');
+}
+
+out.push(
+  `Touches ${changed.length} file${changed.length === 1 ? '' : 's'}` +
+    (source.length ? `, ${source.length} source` : '') +
+    (tests.length ? `, ${tests.length} test` : '') +
+    '.',
+);
 
 if (source.length) {
   try {
@@ -39,24 +57,28 @@ if (source.length) {
 
     const ranked = source
       .map((file) => ({ file, total: allDependents(index, file).size }))
-      .filter((r) => r.total > 0)
       .sort((a, b) => b.total - a.total);
 
     const affected = new Set();
     for (const file of source) allDependents(index, file).forEach((d) => affected.add(d));
 
+    // Sabse zyada asar daalne wali files — inhi par revert/debug ke waqt nazar jaati hai.
+    out.push('');
+    out.push('Files changed (by blast radius):');
+    ranked.slice(0, 8).forEach(({ file, total }) => {
+      out.push(`- ${short(file)}${total ? ` (${total} dependents)` : ''}`);
+    });
+    if (ranked.length > 8) out.push(`- ...and ${ranked.length - 8} more`);
+
     if (affected.size > 0) {
       out.push('');
-      out.push(`Blast radius: ${affected.size} file${affected.size === 1 ? '' : 's'} affected.`);
-      ranked.slice(0, 5).forEach(({ file, total }) => {
-        out.push(`- ${short(file)} -> ${total}`);
-      });
-      if (ranked.length > 5) out.push(`- ...and ${ranked.length - 5} more`);
+      out.push(`Blast radius: ${affected.size} file${affected.size === 1 ? '' : 's'} affected in total.`);
     }
   } catch {
     // Graph na bane to summary ke bina hi chalo — commit message rokna nahi hai.
     out.push('');
-    out.push('Blast radius: could not be computed (dependency graph failed).');
+    out.push('Files changed:');
+    source.slice(0, 8).forEach((f) => out.push(`- ${short(f)}`));
   }
 }
 

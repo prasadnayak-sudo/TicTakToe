@@ -30,11 +30,16 @@ jobs:
 
       - name: Collect changed files
         run: |
-          git fetch origin ${{ github.base_ref }} --depth=1
-          CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+          # No --depth here: checkout already fetched full history (fetch-depth: 0),
+          # and a shallow fetch would break the "git log BASE..HEAD" range.
+          git fetch origin "${{ github.base_ref }}"
+          BASE="origin/${{ github.base_ref }}"
           {
             echo "CHANGED_FILES<<GHEOF"
-            echo "$CHANGED"
+            git diff --name-only "$BASE...HEAD"
+            echo "GHEOF"
+            echo "COMMIT_LINES<<GHEOF"
+            git log --format=%s "$BASE..HEAD"
             echo "GHEOF"
           } >> "$GITHUB_ENV"
 
@@ -56,6 +61,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           CHANGED_FILES: ${{ env.CHANGED_FILES }}
+          COMMIT_LINES: ${{ env.COMMIT_LINES }}
           PR_BODY: ${{ github.event.pull_request.body }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
