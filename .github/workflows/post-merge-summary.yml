@@ -1,13 +1,14 @@
 name: Post-merge Summary
 
-# Merge ke baad chalta hai — PR band hone par, sirf tab jab wo actually merge hua ho.
+# Runs after a PR is merged. Posts a summary on the PR and on the merge commit.
 on:
   pull_request:
     types: [closed]
     branches: [dev, main]
 
 permissions:
-  contents: read
+  # contents: write is needed to comment on the merge commit.
+  contents: write
   pull-requests: write
 
 jobs:
@@ -40,12 +41,11 @@ jobs:
             echo "GHEOF"
           } >> "$GITHUB_ENV"
 
-          # Diff AI ko bhejne ke liye — lock file bahar, aur size capped,
-          # warna prompt bahut bada ho jata hai.
-          git diff "$BASE_SHA...$HEAD_SHA" -- . ':(exclude)package-lock.json' \
-            | head -c 60000 > /tmp/diff.txt
+          # Diff for the AI prompt: lock file excluded and size capped,
+          # otherwise the prompt gets huge.
+          git diff "$BASE_SHA...$HEAD_SHA" -- . ':(exclude)package-lock.json' | head -c 60000 > /tmp/diff.txt
 
-      # Ye hissa hamesha chalta hai — AI ke bharose nahi hai.
+      # This part always runs — it does not depend on the AI.
       - name: Build the deterministic summary
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -100,7 +100,7 @@ jobs:
         if: steps.check.outputs.enabled == 'true'
         run: npm install -g @github/copilot
 
-      # AI fail ho jaye to bhi summary post honi chahiye — isliye continue-on-error.
+      # If the AI step fails the summary must still be posted, hence continue-on-error.
       - name: Ask Copilot for a summary
         id: ai
         if: steps.check.outputs.enabled == 'true'
@@ -133,7 +133,7 @@ jobs:
         run: |
           {
             echo
-            echo "_🤖 Copilot summary was not generated this time — check the 'Ask Copilot for a summary' step in the workflow logs._"
+            echo "_🤖 The Copilot summary was not generated this time — check the 'Ask Copilot for a summary' step in the workflow logs._"
           } >> /tmp/summary.md
 
       - name: Comment on the PR
@@ -142,6 +142,14 @@ jobs:
           header: merge-summary
           number: ${{ github.event.pull_request.number }}
           path: /tmp/summary.md
+
+      # Also attach the summary to the merge commit, so anyone reading the
+      # history — rather than the PR — still finds it.
+      - name: Comment on the merge commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.event.pull_request.merge_commit_sha }}
+        run: gh api "repos/$GITHUB_REPOSITORY/commits/$SHA/comments" -F body=@/tmp/summary.md
 
       - name: Show it on the Actions run too
         if: always()
