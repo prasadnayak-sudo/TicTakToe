@@ -1,41 +1,11 @@
 name: Checks
 
-# Ye job branch protection ka required check hai — merge isi par rukta hai.
 on:
   pull_request:
     branches: [main, dev]
-  # Direct push (ya merge) par bhi chale, taaki base branches par
-  # tootey hue commit ka pata chale.
   push:
     branches: [main, dev]
 
-concurrency:
-  group: checks-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: true
-
-permissions:
-  contents: read
-
 jobs:
-  tests:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-
-      - run: npm ci
-
-      # tsc -b, kyunki root tsconfig.json solution-style hai ("files": []).
-      # `tsc --noEmit` us setup mein ek bhi file check nahi karta.
-      - name: TypeScript
-        run: npx tsc -b
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Tests
-        run: npm test
+  checks:
+    uses: prasadnayak-sudo/ci-workflows/.github/workflows/checks.yml@v1
