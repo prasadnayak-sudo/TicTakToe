@@ -7,5 +7,9 @@ on:
 
 jobs:
   summary:
+    # contents: write merge commit par comment karne ke liye chahiye.
+    permissions:
+      contents: write
+      pull-requests: write
     uses: prasadnayak-sudo/ci_workflows/.github/workflows/post-merge-summary.yml@v1
     secrets: inherit
