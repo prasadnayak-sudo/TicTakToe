@@ -37,6 +37,20 @@ export type Stats = {
   bestStreak: number
 }
 
+/** Ek khatam ho chuke round ka record — charts isi log se bante hain. */
+export type GameRecord = {
+  /** null ka matlab draw. */
+  winner: Player | null
+  mode: Mode
+  size: BoardSize
+  /** Round mein kul kitni chaalein chali. */
+  moves: number
+  /** Pehli chaal ka square index, ya null agar koi chaal hi na chali ho. */
+  opening: number | null
+  /** Epoch millis. */
+  at: number
+}
+
 export type GameState = {
   board: Board
   turn: Player

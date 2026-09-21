@@ -5,17 +5,22 @@ import { DifficultySelector } from './components/DifficultySelector'
 import { GameControls } from './components/GameControls'
 import { ModeSelector } from './components/ModeSelector'
 import { MoveHistory } from './components/MoveHistory'
+import { OpeningHeatmap } from './components/OpeningHeatmap'
+import { ResultsChart } from './components/ResultsChart'
 import { ScoreBoard } from './components/ScoreBoard'
 import { StatusBar } from './components/StatusBar'
 import { other } from './game/board'
+import { toRecord } from './game/records'
 import { useComputerOpponent } from './hooks/useComputerOpponent'
 import { useGame } from './hooks/useGame'
+import { useGameLog } from './hooks/useGameLog'
 import { useStats } from './hooks/useStats'
 import './App.css'
 
 function App() {
   const game = useGame()
   const { stats, record, reset } = useStats(game.mode, game.size)
+  const { log, add: logGame } = useGameLog()
 
   // Computer hamesha starter ka opposite khelta hai.
   const computer = other(game.starter)
@@ -41,13 +46,16 @@ function App() {
     if (counted.current) return
     counted.current = true
     record(game.result)
-  }, [over, game.result, record])
+
+    const entry = toRecord(game.result, game, Date.now())
+    if (entry) logGame(entry)
+  }, [over, game.result, game, record, logGame])
 
   return (
     <>
       <section id="center">
         <div className="header">
-          <h1>Tic Tac</h1>
+          <h1> Tac</h1>
           <ModeSelector mode={game.mode} onChange={game.setMode} />
           <BoardSizeSelector size={game.size} onChange={game.setSize} />
           {game.mode === 'computer' && (
@@ -99,6 +107,13 @@ function App() {
             onJump={game.jump}
           />
         </div>
+      </section>
+
+      <div className="ticks"></div>
+
+      <section id="charts">
+        <ResultsChart log={log} />
+        <OpeningHeatmap log={log} size={game.size} />
       </section>
 
       <div className="ticks"></div>

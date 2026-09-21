@@ -1,7 +1,9 @@
 name: PR Impact Check
 
 # Builds the impact report, comments it on the PR, and writes a compact
-# version into the PR description so it ends up in the commit message.
+# summary into the PR description so it ends up in the commit message
+# (Settings > General > Default commit message = "Pull request title and description").
+#
 # This is a report only — it is not a gate. To block merges, make the
 # `tests` job in the Checks workflow a required check.
 on:
@@ -43,6 +45,9 @@ jobs:
             echo "GHEOF"
           } >> "$GITHUB_ENV"
 
+          # Diff for the AI prompt: lock file excluded and size capped.
+          git diff "$BASE...HEAD" -- . ':(exclude)package-lock.json' | head -c 60000 > /tmp/diff.txt
+
       - name: Build the impact report
         run: node scripts/impact-report.mjs > impact.md
         env:
@@ -54,18 +59,93 @@ jobs:
           header: pr-impact
           path: impact.md
 
-      # The compact summary goes into the PR description, because GitHub can
-      # copy the description into the squash/merge commit message. The full
-      # report stays in the comment — a mermaid graph is useless in a commit.
+      # The facts half of the description block. Always produced, with or
+      # without the AI.
+      - name: Build the factual summary
+        env:
+          CHANGED_FILES: ${{ env.CHANGED_FILES }}
+          COMMIT_LINES: ${{ env.COMMIT_LINES }}
+        run: node scripts/commit-summary.mjs > /tmp/facts.md
+
+      - name: Check whether Copilot is configured
+        id: check
+        env:
+          COPILOT_PAT: ${{ secrets.COPILOT_PAT }}
+        run: |
+          if [ -n "$COPILOT_PAT" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "COPILOT_PAT is not set — the commit summary will be facts only." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Build the Copilot prompt
+        if: steps.check.outputs.enabled == 'true'
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          {
+            echo "Below is the diff of a pull request."
+            echo "Write the BODY of its commit message in English."
+            echo
+            echo "Rules:"
+            echo "- Explain what changed and why. Plain prose, 2-4 short paragraphs."
+            echo "- No markdown headings, no bold, no bullet lists unless truly needed."
+            echo "- Do not repeat the PR title. Do not paste the diff back."
+            echo "- Do not list file names or counts - that is added separately."
+            echo "- Only state what the diff actually shows. Do not guess intent."
+            echo "- Wrap lines at about 72 characters."
+            echo
+            echo "PR title: $PR_TITLE"
+            echo
+            echo "Diff:"
+            echo '```diff'
+            cat /tmp/diff.txt
+            echo '```'
+          } > /tmp/prompt.txt
+
+      - name: Install the Copilot CLI
+        if: steps.check.outputs.enabled == 'true'
+        run: npm install -g @github/copilot
+
+      # Best effort: if the AI step fails the description still gets the facts.
+      - name: Ask Copilot to write the message
+        id: ai
+        if: steps.check.outputs.enabled == 'true'
+        continue-on-error: true
+        uses: actions/ai-inference@v1
+        with:
+          prompt-file: /tmp/prompt.txt
+          model: claude-sonnet-4.5
+          system-prompt: >-
+            You write commit messages. Plain, specific, and short. You describe
+            what changed and why it changed, never how impressive it is. Write
+            in English.
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
+
+      # AI prose first, then the facts underneath.
+      - name: Assemble the summary block
+        env:
+          AI_RESPONSE: ${{ steps.ai.outputs.response }}
+        run: |
+          if [ -n "$AI_RESPONSE" ]; then
+            {
+              echo "$AI_RESPONSE"
+              echo
+              cat /tmp/facts.md
+            } > /tmp/summary.md
+          else
+            cp /tmp/facts.md /tmp/summary.md
+          fi
+
       - name: Write the summary into the PR description
         env:
           GH_TOKEN: ${{ github.token }}
-          CHANGED_FILES: ${{ env.CHANGED_FILES }}
-          COMMIT_LINES: ${{ env.COMMIT_LINES }}
           PR_BODY: ${{ github.event.pull_request.body }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          SUMMARY="$(node scripts/commit-summary.mjs)"
+          SUMMARY="$(cat /tmp/summary.md)"
           export SUMMARY
           node scripts/update-pr-body.mjs > /tmp/body.md
           gh pr edit "$PR_NUMBER" --body-file /tmp/body.md
