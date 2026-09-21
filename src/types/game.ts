@@ -35,6 +35,12 @@ export type Stats = {
   draws: number
   currentStreak: Streak | null
   bestStreak: number
+  /**
+   * Best streak kiski thi. null tab hai jab wo streak per-player tracking se
+   * pehle save hui thi — us waqt player record hota hi nahi tha, isliye use
+   * guess karne ke bajaye khali chhoda jaata hai.
+   */
+  bestStreakBy: Player | null
 }
 
 /** Ek khatam ho chuke round ka record — charts isi log se bante hain. */
