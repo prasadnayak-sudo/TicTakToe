@@ -1,0 +1,11 @@
+name: PR Impact
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main, dev]
+
+jobs:
+  impact:
+    uses: prasadnayak-sudo/ci_workflows/.github/workflows/pr-impact.yml@v1
+    secrets: inherit
