@@ -295,3 +295,281 @@
     border-right-color: var(--border);
   }
 }
+
+/* ── Charts ──────────────────────────────────────────────────────────────
+   Colours yahan chart ke apne roles hain, app ke accent se alag. Ye steps
+   validate kiye gaye hain (categorical: lightness band, chroma floor, CVD
+   separation, normal-vision floor, contrast) app ke apne surfaces ke against.
+   Light mode mein slot 3 surface se 2.82:1 par hai — sub-3:1 — isliye har
+   value direct label aur table view dono mein maujood hai. */
+.viz-root {
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+
+  /* Sequential single hue (blue), light se dark. */
+  --heat-0: #eef4fd;
+  --heat-1: #cde2fb;
+  --heat-2: #9ec5f4;
+  --heat-3: #5598e7;
+  --heat-4: #2a78d6;
+  --heat-ink-0: var(--text);
+  --heat-ink-4: #fff;
+
+  --chart-surface: var(--bg);
+  --chart-grid: var(--border);
+}
+
+/* Dark ke steps alag chune gaye hain — light ka flip nahi. */
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme='light'])) .viz-root {
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+
+    --heat-0: #1b2433;
+    --heat-1: #14375f;
+    --heat-2: #184f95;
+    --heat-3: #256abf;
+    --heat-4: #3987e5;
+    --heat-ink-4: #fff;
+  }
+}
+
+:root[data-theme='dark'] .viz-root {
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --heat-0: #1b2433;
+  --heat-1: #14375f;
+  --heat-2: #184f95;
+  --heat-3: #256abf;
+  --heat-4: #3987e5;
+  --heat-ink-4: #fff;
+}
+
+#charts {
+  display: flex;
+  gap: 32px;
+  padding: 32px;
+  text-align: left;
+  border-top: 1px solid var(--border);
+
+  & > * {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  @media (max-width: 1024px) {
+    flex-direction: column;
+    padding: 24px 20px;
+    gap: 24px;
+  }
+}
+
+.chart-card {
+  position: relative;
+  margin: 0;
+}
+
+.chart-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+
+  h3 {
+    font: 500 18px var(--heading);
+    color: var(--text-h);
+    margin: 0 0 2px;
+  }
+}
+
+.chart-empty {
+  padding: 18px 0;
+}
+
+/* Stacked bar: 24px cap, ends rounded, segments 2px surface gap se alag. */
+.stack-bar {
+  display: flex;
+  gap: 2px;
+  height: 24px;
+  border-radius: 4px;
+  overflow: visible;
+}
+
+.stack-segment {
+  border: none;
+  padding: 0;
+  cursor: default;
+  min-width: 2px;
+  background: var(--series-1);
+
+  &:first-child {
+    border-radius: 4px 0 0 4px;
+  }
+  &:last-child {
+    border-radius: 0 4px 4px 0;
+  }
+  &:focus-visible {
+    outline: 2px solid var(--text-h);
+    outline-offset: 2px;
+  }
+}
+
+.slot-1 {
+  background: var(--series-1);
+}
+.slot-2 {
+  background: var(--series-2);
+}
+.slot-3 {
+  background: var(--series-3);
+}
+
+.chart-legend {
+  list-style: none;
+  padding: 0;
+  margin: 14px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  font-size: 14px;
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+}
+
+.legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex: none;
+}
+
+.legend-value {
+  color: var(--text-h);
+  font-variant-numeric: tabular-nums;
+}
+
+.heatmap {
+  display: grid;
+  grid-template-columns: repeat(var(--board-size, 3), 1fr);
+  gap: 2px;
+  max-width: 260px;
+}
+
+.heat-cell {
+  aspect-ratio: 1;
+  border: none;
+  border-radius: 2px;
+  font: 500 14px var(--sans);
+  font-variant-numeric: tabular-nums;
+  color: var(--heat-ink-0);
+  background: var(--heat-0);
+  cursor: default;
+  display: grid;
+  place-items: center;
+
+  &:focus-visible {
+    outline: 2px solid var(--text-h);
+    outline-offset: 2px;
+  }
+}
+
+.heat-0 {
+  background: var(--heat-0);
+}
+.heat-1 {
+  background: var(--heat-1);
+}
+.heat-2 {
+  background: var(--heat-2);
+}
+.heat-3 {
+  background: var(--heat-3);
+  color: var(--heat-ink-4);
+}
+.heat-4 {
+  background: var(--heat-4);
+  color: var(--heat-ink-4);
+}
+
+.heat-scale {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 14px;
+  font-size: 13px;
+
+  .legend-swatch {
+    width: 22px;
+    height: 8px;
+    border-radius: 1px;
+  }
+}
+
+.chart-table {
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+
+  th,
+  td {
+    text-align: left;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  td {
+    color: var(--text-h);
+    font-variant-numeric: tabular-nums;
+  }
+
+  thead th {
+    font-weight: 500;
+    color: var(--text);
+  }
+}
+
+.chart-tooltip {
+  position: absolute;
+  transform: translate(-50%, -100%) translateY(-8px);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+  padding: 6px 10px;
+  font-size: 13px;
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 2;
+  display: grid;
+  gap: 1px;
+}
+
+.chart-tooltip-value {
+  color: var(--text-h);
+  font-variant-numeric: tabular-nums;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.chart-tooltip-label {
+  color: var(--text);
+}
