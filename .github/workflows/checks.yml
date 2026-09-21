@@ -8,4 +8,4 @@ on:
 
 jobs:
   checks:
-    uses: prasadnayak-sudo/ci-workflows/.github/workflows/checks.yml@v1
+    uses: prasadnayak-sudo/ci_workflows/.github/workflows/checks.yml@v1
