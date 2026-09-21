@@ -1,0 +1,16 @@
+name: PR Impact
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main, dev]
+
+jobs:
+  impact:
+    # Called workflow caller job se zyada permission nahi le sakta, isliye
+    # yahan dena zaroori hai — warna run startup par hi fail ho jaata hai.
+    permissions:
+      contents: read
+      pull-requests: write
+    uses: prasadnayak-sudo/ci_workflows/.github/workflows/pr-impact.yml@v1
+    secrets: inherit

@@ -51,7 +51,12 @@ export function ScoreBoard({ stats, mode, size, computer, onReset }: Props) {
         {stats.currentStreak
           ? `Abhi ${stats.currentStreak.player} ki ${stats.currentStreak.length} ki streak`
           : 'Koi active streak nahi'}
-        {stats.bestStreak > 0 && ` · best ${stats.bestStreak}`}
+        {stats.bestStreak > 0 &&
+          // bestStreakBy purane saved data mein nahi hota, tab sirf number
+          // dikhta hai — kiski thi ye banane ke bajaye chhod dena behtar hai.
+          (stats.bestStreakBy
+            ? ` · best ${stats.bestStreak} (${stats.bestStreakBy})`
+            : ` · best ${stats.bestStreak}`)}
       </p>
     </div>
   )
