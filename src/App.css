@@ -390,32 +390,34 @@
   padding: 18px 0;
 }
 
-/* Stacked bar: 24px cap, ends rounded, segments 2px surface gap se alag. */
-.stack-bar {
+/* Pie chart styles */
+.pie-chart-container {
   display: flex;
-  gap: 2px;
-  height: 24px;
-  border-radius: 4px;
+  justify-content: center;
+  align-items: center;
+  margin: 16px 0;
+}
+
+.pie-svg {
+  width: 140px;
+  height: 140px;
+  transform: rotate(-90deg);
+  border-radius: 50%;
   overflow: visible;
 }
 
-.stack-segment {
-  border: none;
-  padding: 0;
-  cursor: default;
-  min-width: 2px;
-  background: var(--series-1);
+.pie-segment {
+  cursor: pointer;
+  outline: none;
+  transition: opacity 0.2s;
+}
 
-  &:first-child {
-    border-radius: 4px 0 0 4px;
-  }
-  &:last-child {
-    border-radius: 0 4px 4px 0;
-  }
-  &:focus-visible {
-    outline: 2px solid var(--text-h);
-    outline-offset: 2px;
-  }
+.pie-segment:focus-visible {
+  opacity: 0.8;
+}
+
+.pie-segment:hover {
+  opacity: 0.8;
 }
 
 .slot-1 {
