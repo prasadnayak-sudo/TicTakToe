@@ -15,7 +15,7 @@ export function useChartTooltip() {
   const [tooltip, setTooltip] = useState<TooltipState>(null)
 
   const show = useCallback(
-    (event: { currentTarget: HTMLElement }, label: string, value: string) => {
+    (event: { currentTarget: Element }, label: string, value: string) => {
       const target = event.currentTarget
       const box = target.getBoundingClientRect()
       const parent = target.closest('.chart-card')?.getBoundingClientRect()
