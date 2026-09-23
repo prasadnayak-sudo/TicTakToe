@@ -10,10 +10,6 @@ type Props = {
   log: GameRecord[]
 }
 
-/**
- * Part-to-whole — isliye horizontal stacked bar, pie nahi. Teen series hain,
- * toh legend ke saath direct labels bhi safe hain.
- */
 export function ResultsChart({ log }: Props) {
   const { tooltip, show, hide } = useChartTooltip()
   const counts = outcomeCounts(log)
@@ -58,28 +54,34 @@ export function ResultsChart({ log }: Props) {
         <p className="muted chart-empty">Finish a round and it shows up here.</p>
       ) : (
         <>
-          <div className="stack-bar" role="img" aria-label={
+          <div className="pie-chart-container" role="img" aria-label={
             series.map((s) => `${s.label}: ${s.value}`).join(', ')
           }>
-            {series.map((s, i) =>
-              segments[i].size === 0 ? null : (
-                <button
-                  key={s.key}
-                  type="button"
-                  className={`stack-segment slot-${s.slot}`}
-                  style={{ width: `${segments[i].size}%` }}
-                  onMouseEnter={(e) => show(e, s.label, `${s.value} games`)}
-                  onMouseLeave={hide}
-                  onFocus={(e) => show(e, s.label, `${s.value} games`)}
-                  onBlur={hide}
-                >
-                  <span className="sr-only">{`${s.label}: ${s.value}`}</span>
-                </button>
-              ),
-            )}
+            <svg viewBox="0 0 32 32" className="pie-svg">
+              {series.map((s, i) => {
+                if (segments[i].size === 0) return null
+                return (
+                  <circle
+                    key={s.key}
+                    r="15.915494309189533"
+                    cx="16"
+                    cy="16"
+                    fill="transparent"
+                    stroke={`var(--series-${s.slot})`}
+                    strokeWidth="32"
+                    strokeDasharray={`0 ${segments[i].start} ${segments[i].size} ${100 - segments[i].start - segments[i].size}`}
+                    className="pie-segment"
+                    onMouseEnter={(e) => show(e, s.label, `${s.value} games`)}
+                    onMouseLeave={hide}
+                    onFocus={(e) => show(e, s.label, `${s.value} games`)}
+                    onBlur={hide}
+                    tabIndex={0}
+                  />
+                )
+              })}
+            </svg>
           </div>
 
-          {/* Legend hamesha — pehchaan kabhi sirf colour se na aaye. */}
           <ul className="chart-legend">
             {series.map((s) => (
               <li key={s.key}>
